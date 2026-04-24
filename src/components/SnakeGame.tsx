@@ -12,10 +12,13 @@ interface Point {
 
 interface SnakeGameProps {
   onScoreChange: (score: number) => void;
+  onTimeUpdate: (seconds: number) => void;
+  onGameOver: (score: number) => void;
   isPaused: boolean;
 }
 
 const GRID_SIZE = 20;
+const INITIAL_TIME = 120; // 2 minutes in seconds
 const INITIAL_SNAKE: Point[] = [
   { x: 10, y: 10 },
   { x: 10, y: 11 },
@@ -23,13 +26,15 @@ const INITIAL_SNAKE: Point[] = [
 ];
 const INITIAL_DIRECTION: Point = { x: 0, y: -1 };
 
-export const SnakeGame: React.FC<SnakeGameProps> = ({ onScoreChange, isPaused }) => {
+export const SnakeGame: React.FC<SnakeGameProps> = ({ onScoreChange, onTimeUpdate, onGameOver, isPaused }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [snake, setSnake] = useState<Point[]>(INITIAL_SNAKE);
   const [direction, setDirection] = useState<Point>(INITIAL_DIRECTION);
   const [food, setFood] = useState<Point>({ x: 5, y: 5 });
   const [score, setScore] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(INITIAL_TIME);
   const [gameOver, setGameOver] = useState(false);
+  const [reason, setReason] = useState<'collision' | 'timeout' | null>(null);
 
   const generateFood = useCallback((currentSnake: Point[]): Point => {
     let newFood: Point;
@@ -50,8 +55,11 @@ export const SnakeGame: React.FC<SnakeGameProps> = ({ onScoreChange, isPaused })
     setDirection(INITIAL_DIRECTION);
     setFood({ x: 5, y: 5 });
     setScore(0);
+    setTimeLeft(INITIAL_TIME);
     onScoreChange(0);
+    onTimeUpdate(INITIAL_TIME);
     setGameOver(false);
+    setReason(null);
   };
 
   useEffect(() => {
@@ -79,6 +87,27 @@ export const SnakeGame: React.FC<SnakeGameProps> = ({ onScoreChange, isPaused })
   useEffect(() => {
     if (gameOver || isPaused) return;
 
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          setGameOver(true);
+          setReason('timeout');
+          onGameOver(score);
+          return 0;
+        }
+        const next = prev - 1;
+        onTimeUpdate(next);
+        return next;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [gameOver, isPaused, score, onGameOver, onTimeUpdate]);
+
+  useEffect(() => {
+    if (gameOver || isPaused) return;
+
     const moveSnake = () => {
       setSnake((prevSnake) => {
         const head = prevSnake[0];
@@ -90,6 +119,8 @@ export const SnakeGame: React.FC<SnakeGameProps> = ({ onScoreChange, isPaused })
         // Collision with self
         if (prevSnake.some((segment) => segment.x === newHead.x && segment.y === newHead.y)) {
           setGameOver(true);
+          setReason('collision');
+          onGameOver(score);
           return prevSnake;
         }
 
@@ -158,9 +189,9 @@ export const SnakeGame: React.FC<SnakeGameProps> = ({ onScoreChange, isPaused })
 
     // Draw snake
     snake.forEach((segment, index) => {
-      ctx.fillStyle = index === 0 ? '#00ffff' : '#00cccc';
+      ctx.fillStyle = index === 0 ? '#FFD700' : '#B8860B';
       ctx.shadowBlur = index === 0 ? 15 : 5;
-      ctx.shadowColor = '#00ffff';
+      ctx.shadowColor = '#FFD700';
       ctx.beginPath();
       ctx.roundRect(
         segment.x * cellSize + 2,
@@ -176,16 +207,16 @@ export const SnakeGame: React.FC<SnakeGameProps> = ({ onScoreChange, isPaused })
     if (gameOver) {
       ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = '#00ffff';
+      ctx.fillStyle = reason === 'timeout' ? '#FFD700' : '#00ffff';
       ctx.font = 'bold 30px Inter';
       ctx.textAlign = 'center';
-      ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2 - 20);
+      ctx.fillText(reason === 'timeout' ? 'TIME UP' : 'GAME OVER', canvas.width / 2, canvas.height / 2 - 20);
       ctx.font = '20px Inter';
       ctx.fillText(`Score: ${score}`, canvas.width / 2, canvas.height / 2 + 20);
       ctx.font = '16px Inter';
       ctx.fillText('Press R to restart', canvas.width / 2, canvas.height / 2 + 50);
     }
-  }, [snake, food, gameOver, score]);
+  }, [snake, food, gameOver, score, reason]);
 
   useEffect(() => {
     const handleReset = (e: KeyboardEvent) => {

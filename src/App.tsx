@@ -12,7 +12,14 @@ import { SONGS } from './constants';
 export default function App() {
   const [score, setScore] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(120);
   const [currentSongIndex, setCurrentSongIndex] = useState(1); // Default to Midnight Pulse
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
 
   return (
     <div className="min-h-screen bg-[#050505] text-[#f0f0f0] font-sans relative overflow-hidden flex flex-col p-8 selection:bg-neon-cyan/30">
@@ -26,8 +33,10 @@ export default function App() {
         </div>
         <div className="flex items-center gap-8">
           <div className="flex flex-col items-end">
-            <span className="text-[10px] uppercase opacity-50">Current Session</span>
-            <span className="font-mono text-2xl neon-text-magenta">00:14:42</span>
+            <span className="text-[10px] uppercase opacity-50">Session Time Remaining</span>
+            <span className={`font-mono text-2xl transition-colors ${timeLeft < 10 ? 'neon-text-magenta animate-pulse' : 'neon-text-cyan'}`}>
+              {formatTime(timeLeft)}
+            </span>
           </div>
           <div className="w-12 h-12 rounded-full neon-border-cyan flex items-center justify-center">
             <div className={`w-2 h-2 bg-[#00f3ff] rounded-full ${isPlaying ? 'animate-pulse' : ''}`}></div>
@@ -87,7 +96,12 @@ export default function App() {
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-[1px] bg-white/5"></div>
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-full w-[1px] bg-white/5"></div>
             
-            <SnakeGame onScoreChange={setScore} isPaused={!isPlaying} />
+            <SnakeGame 
+              onScoreChange={setScore} 
+              onTimeUpdate={setTimeLeft}
+              onGameOver={() => setIsPlaying(false)}
+              isPaused={!isPlaying} 
+            />
           </div>
 
           <div className="mt-6 flex gap-4">
